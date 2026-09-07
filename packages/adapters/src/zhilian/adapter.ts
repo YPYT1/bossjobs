@@ -3,7 +3,9 @@ import type { Page } from "playwright";
 import { BrowserManager } from "../browser.js";
 import { captureJsonViaCdp } from "../capture.js";
 import { resolveZhilianCityCode } from "../city-codes.js";
-import { ensureHostPage, pageFetchJson } from "../page-api.js";
+import { pickCompanyFullName } from "../company-name.js";
+import { ensureHostPage, pageFetchJson, safeEvaluate } from "../page-api.js";
+import { ZHILIAN_HARD_MAX_PAGES, politeDelay } from "../rate-limit.js";
 import type { JobRef, PlatformAdapter } from "../types.js";
 import {
   extractZhilianList,
@@ -12,7 +14,6 @@ import {
   type ZhilianSearchApiResponse,
 } from "./mapper.js";
 
-/** From BossHunter zhilian.py API-fetch mode */
 const API_SEARCH_URL = "https://fe-api.zhaopin.com/c/i/sou";
 const API_PAGE_SIZE = 20;
 const HOST = "https://www.zhaopin.com/";
@@ -20,19 +21,19 @@ const HOST = "https://www.zhaopin.com/";
 export interface ZhilianAdapterOptions {
   browser?: BrowserManager;
   pageDelayMs?: number;
+  jitterMs?: number;
 }
 
-/**
- * Zhilian adapter — Path C: thin browser + fe-api.zhaopin.com/c/i/sou
- */
 export class ZhilianAdapter implements PlatformAdapter {
   readonly platform = "zhilian" as const;
   private readonly browser: BrowserManager;
   private readonly pageDelayMs: number;
+  private readonly jitterMs: number;
 
   constructor(options: ZhilianAdapterOptions = {}) {
     this.browser = options.browser ?? new BrowserManager();
-    this.pageDelayMs = options.pageDelayMs ?? 1500;
+    this.pageDelayMs = options.pageDelayMs ?? 5000;
+    this.jitterMs = options.jitterMs ?? 4000;
   }
 
   async resolveCityCode(cityName: string): Promise<string> {
@@ -62,8 +63,6 @@ export class ZhilianAdapter implements PlatformAdapter {
         ok: false,
         message: err instanceof Error ? err.message : String(err),
       };
-    } finally {
-      await page.close().catch(() => undefined);
     }
   }
 
@@ -71,64 +70,91 @@ export class ZhilianAdapter implements PlatformAdapter {
     city: string;
     keyword: string;
     pages?: number;
+    exhaust?: boolean;
+    delayMs?: number;
+    jitterMs?: number;
+    onPage?: (info: {
+      page: number;
+      maxPages: number;
+      batch: number;
+      total: number;
+    }) => void | Promise<void>;
   }): Promise<RawJobListItem[]> {
-    const pages = Math.min(Math.max(input.pages ?? 1, 1), 50);
+    const delay = input.delayMs ?? this.pageDelayMs;
+    const jitter = input.jitterMs ?? this.jitterMs;
+    const maxPages = input.exhaust
+      ? ZHILIAN_HARD_MAX_PAGES
+      : Math.min(Math.max(input.pages ?? 1, 1), ZHILIAN_HARD_MAX_PAGES);
     const page = await this.browser.newPage();
     const seen = new Set<string>();
     const results: RawJobListItem[] = [];
 
-    try {
-      for (let p = 1; p <= pages; p++) {
-        const payload = await this.fetchSou(page, {
-          city: input.city,
-          keyword: input.keyword,
-          page: p,
-        });
-        const mapped = mapZhilianListResponse(payload, input.city);
-        if (mapped.length === 0 && p === 1) {
-          throw new Error(
-            "智联 sou 无列表。请 `bossjobs auth setup` 登录 zhaopin.com。",
-          );
-        }
-        for (const item of mapped) {
-          if (seen.has(item.platformJobId)) continue;
-          seen.add(item.platformJobId);
-          results.push(item);
-        }
-        if (mapped.length < API_PAGE_SIZE) break;
-        if (p < pages) await page.waitForTimeout(this.pageDelayMs);
+    for (let p = 1; p <= maxPages; p++) {
+      const payload = await this.fetchSou(page, {
+        city: input.city,
+        keyword: input.keyword,
+        page: p,
+      });
+      const mapped = mapZhilianListResponse(payload, input.city);
+      if (mapped.length === 0 && p === 1) {
+        throw new Error(
+          "智联 sou 无列表。请 `bossjobs auth setup` 登录 zhaopin.com。",
+        );
       }
-      return results;
-    } finally {
-      await page.close().catch(() => undefined);
+      let batchNew = 0;
+      for (const item of mapped) {
+        if (seen.has(item.platformJobId)) continue;
+        seen.add(item.platformJobId);
+        results.push(item);
+        batchNew++;
+      }
+      await input.onPage?.({
+        page: p,
+        maxPages,
+        batch: batchNew,
+        total: results.length,
+      });
+      if (mapped.length < API_PAGE_SIZE) break;
+      if (batchNew === 0 && p > 1) break;
+      if (p < maxPages) await politeDelay(page, delay, jitter);
     }
+    return results;
   }
 
   async fetchDetail(ref: JobRef): Promise<RawJobDetail> {
-    if (!ref.jobUrl) {
-      return { platformJobId: ref.platformJobId };
-    }
+    if (!ref.jobUrl) return { platformJobId: ref.platformJobId };
     const page = await this.browser.newPage();
-    try {
-      await page.goto(ref.jobUrl, {
-        waitUntil: "domcontentloaded",
-        timeout: 60_000,
-      });
-      await page.waitForTimeout(1200);
-      const jd = await page
-        .locator(
-          ".describtion__detail-content, .job-detail, [class*='description']",
-        )
-        .first()
-        .innerText()
-        .catch(() => "");
-      return {
-        platformJobId: ref.platformJobId,
-        jd: jd.trim() || undefined,
-      };
-    } finally {
-      await page.close().catch(() => undefined);
-    }
+    await page.goto(ref.jobUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
+    await page.waitForTimeout(1200);
+    const extracted = await safeEvaluate(page, () => {
+      const jd =
+        (
+          document.querySelector(
+            ".describtion__detail-content, .job-detail, [class*='description']",
+          ) as HTMLElement | null
+        )?.innerText?.trim() ?? "";
+      const companyCandidates = [
+        (
+          document.querySelector(
+            ".company__title, .company-name, [class*='company-name'] a, [class*='companyName']",
+          ) as HTMLElement | null
+        )?.innerText?.trim(),
+        (
+          document.querySelector(
+            ".summary-plane__title, .company__info",
+          ) as HTMLElement | null
+        )?.innerText?.trim(),
+      ].filter(Boolean) as string[];
+      return { jd, companyCandidates };
+    });
+    return {
+      platformJobId: ref.platformJobId,
+      jd: extracted.jd || undefined,
+      companyName: pickCompanyFullName(...extracted.companyCandidates),
+    };
   }
 
   private async fetchSou(
@@ -142,7 +168,13 @@ export class ZhilianAdapter implements PlatformAdapter {
       `${API_SEARCH_URL}?keyword=${encodeURIComponent(opts.keyword)}` +
       `&cityId=${cityId}&start=${start}&count=${API_PAGE_SIZE}`;
 
-    const result = await pageFetchJson(page, url);
+    const result = await pageFetchJson(page, url, {
+      headers: {
+        Referer: "https://www.zhaopin.com/",
+        Origin: "https://www.zhaopin.com",
+      },
+      fallbackOrigin: "https://fe-api.zhaopin.com",
+    });
     if (!result.error && result.httpStatus === 200 && result.body) {
       try {
         const payload = JSON.parse(result.body) as ZhilianSearchApiResponse;
@@ -180,7 +212,7 @@ export class ZhilianAdapter implements PlatformAdapter {
       try {
         return JSON.parse(result.body || "{}") as ZhilianSearchApiResponse;
       } catch {
-        throw new Error("智联 sou 返回非 JSON（可能需登录或触发验证码）");
+        throw new Error("智联 sou 返回非 JSON（可能需登录）");
       }
     }
   }

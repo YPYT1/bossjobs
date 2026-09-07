@@ -145,13 +145,18 @@ auth
 
 program
   .command("collect")
-  .description("采集岗位（薄浏览器 + 官方接口）")
+  .description("采集岗位（薄浏览器 + 官方接口，默认慢速）")
   .requiredOption("--platform <platform>", "boss | zhilian")
   .requiredOption("--city <city>", "城市")
   .option("--keyword <keyword>", "单个关键词")
   .option("--keywords <list>", "多关键词，逗号分隔")
-  .option("--pages <n>", "页数", "1")
-  .option("--detail", "抓详情 JD/薪资")
+  .option("--pages <n>", "页数（未开 --all 时）", "3")
+  .option("--all", "翻页直到无新数据（慢速，尽量拿全）")
+  .option("--detail", "抓详情 JD / 公司全称（默认开启）", true)
+  .option("--no-detail", "仅列表，不抓详情")
+  .option("--no-skip", "不跳过库中已有岗位")
+  .option("--delay <ms>", "页间隔毫秒", "4500")
+  .option("--jitter <ms>", "随机抖动毫秒", "3500")
   .option("--json")
   .action(
     async (opts: {
@@ -160,7 +165,11 @@ program
       keyword?: string;
       keywords?: string;
       pages: string;
+      all?: boolean;
       detail?: boolean;
+      skip?: boolean;
+      delay: string;
+      jitter: string;
       json?: boolean;
     }) => {
       const platform = opts.platform as Platform;
@@ -177,18 +186,31 @@ program
         return;
       }
       try {
-        const results = await collectJobs({
-          platform,
-          city: opts.city,
-          keyword: keywords[0]!,
-          keywords,
-          pages: Number(opts.pages) || 1,
-          withDetail: Boolean(opts.detail),
-        });
+        const results = await collectJobs(
+          {
+            platform,
+            city: opts.city,
+            keyword: keywords[0]!,
+            keywords,
+            pages: Number(opts.pages) || 3,
+            exhaust: Boolean(opts.all),
+            withDetail: opts.detail !== false,
+            skipExisting: opts.skip !== false,
+            delayMs: Number(opts.delay) || 4500,
+            jitterMs: Number(opts.jitter) || 3500,
+          },
+          {
+            onProgress: (p) => {
+              if (!opts.json) console.error(`[${p.phase}] ${p.message}`);
+            },
+          },
+        );
         const data = {
           db: getDbPath(),
           results,
-          total: results.reduce((a, r) => a + r.count, 0),
+          inserted: results.reduce((a, r) => a + r.inserted, 0),
+          skipped: results.reduce((a, r) => a + r.skipped, 0),
+          listed: results.reduce((a, r) => a + r.listed, 0),
         };
         if (opts.json) printJson(true, data);
         else console.log(JSON.stringify(data, null, 2));

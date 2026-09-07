@@ -1,10 +1,10 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
+import { AppNav } from "@/components/AppNav";
 import "./globals.css";
 
 export const metadata = {
   title: "BossJobs",
-  description: "本地岗位情报台",
+  description: "本地岗位情报台 · 慢速全量采集",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -12,17 +12,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="zh-CN">
       <body>
         <div className="shell">
-          <nav className="nav">
-            <Link className="brand" href="/">
-              BossJobs
-            </Link>
-            <Link href="/jobs">岗位</Link>
-            <Link href="/tasks">采集</Link>
-            <Link href="/analytics">分析</Link>
-            <Link href="/companies">公司</Link>
-            <Link href="/settings">设置</Link>
-          </nav>
-          {children}
+          <AppNav />
+          <div className="page">{children}</div>
         </div>
       </body>
     </html>

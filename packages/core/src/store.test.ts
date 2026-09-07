@@ -19,7 +19,7 @@ describe("JobStore", () => {
     dirs.push(dir);
     const store = new JobStore(path.join(dir, "t.db"));
 
-    store.upsertFromListItem(
+    const a = store.upsertFromListItem(
       {
         platform: "boss",
         platformJobId: "j1",
@@ -30,8 +30,9 @@ describe("JobStore", () => {
       },
       "AI开发",
     );
+    expect(a.created).toBe(true);
 
-    store.upsertFromListItem(
+    const b = store.upsertFromListItem(
       {
         platform: "boss",
         platformJobId: "j1",
@@ -43,12 +44,14 @@ describe("JobStore", () => {
       },
       "AI开发",
     );
+    expect(b.created).toBe(false);
 
     const list = store.list({ city: "重庆" });
     expect(list).toHaveLength(1);
     expect(list[0]!.title).toBe("AI开发工程师");
     expect(list[0]!.salaryMin).toBe(25000);
     expect(list[0]!.location).toBe("渝北");
+    expect(store.hasJob("boss", "j1")).toBe(true);
     store.close();
   });
 });

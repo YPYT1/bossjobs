@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertBossApiOk,
   isBossJobListUrl,
+  mapBossDetailResponse,
   mapBossListResponse,
 } from "./mapper.js";
 
@@ -28,6 +29,7 @@ describe("Boss API contract", () => {
               businessDistrict: "两江新区",
               salaryDesc: "20-40K·15薪",
               brandName: "测试科技",
+              companyFullName: "重庆测试科技有限公司",
               welfareList: ["五险一金", "年终奖"],
               jobExperience: "3-5年",
               jobDegree: "本科",
@@ -43,9 +45,33 @@ describe("Boss API contract", () => {
     expect(jobs).toHaveLength(1);
     expect(jobs[0]!.salaryRaw).toBe("20-40K·15薪");
     expect(jobs[0]!.title).toBe("AI开发工程师");
-    expect(jobs[0]!.companyName).toBe("测试科技");
+    expect(jobs[0]!.companyName).toBe("重庆测试科技有限公司");
     expect(jobs[0]!.location).toBe("渝北区·两江新区");
     expect(jobs[0]!.detailContext?.securityId).toBe("sec");
+  });
+
+  it("prefers brandComInfo company 全称 from detail mapper", () => {
+    const detail = mapBossDetailResponse(
+      {
+        code: 0,
+        zpData: {
+          jobInfo: {
+            postDescription: "负责 Agent 研发，双休",
+            salaryDesc: "25-40K",
+            address: "重庆渝北",
+            welfareList: ["五险一金"],
+          },
+          brandComInfo: {
+            brandName: "某某",
+            companyName: "重庆某某人工智能科技有限公司",
+          },
+        },
+      },
+      "jid1",
+    );
+    expect(detail.companyName).toBe("重庆某某人工智能科技有限公司");
+    expect(detail.jd).toContain("Agent");
+    expect(detail.isDoubleOff).toBe(true);
   });
 
   it("throws on risk-control codes", () => {

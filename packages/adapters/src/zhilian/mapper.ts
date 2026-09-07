@@ -1,4 +1,5 @@
 import type { RawJobListItem } from "@bossjobs/core";
+import { pickCompanyFullName } from "../company-name.js";
 
 /** Zhilian search API item — fields vary by endpoint generation. */
 export interface ZhilianJobApiItem {
@@ -15,9 +16,15 @@ export interface ZhilianJobApiItem {
   cityName?: string;
   workingExp?: string | { name?: string };
   education?: string | { name?: string };
-  company?: { name?: string };
+  company?: {
+    name?: string;
+    fullName?: string;
+    companyName?: string;
+    companyFullName?: string;
+  };
   companyName?: string;
   companyNameFormat?: string;
+  companyFullName?: string;
   jobSummary?: string;
   welfareTagList?: Array<string | { name?: string }>;
   jobTypeLevelName?: string;
@@ -71,10 +78,15 @@ export function mapZhilianListItem(
 
   const title = item.name ?? item.jobName ?? item.title ?? "";
   const companyName =
-    item.companyName ??
-    item.companyNameFormat ??
-    item.company?.name ??
-    "未知公司";
+    pickCompanyFullName(
+      item.companyFullName,
+      item.company?.companyFullName,
+      item.company?.fullName,
+      item.company?.companyName,
+      item.companyName,
+      item.companyNameFormat,
+      item.company?.name,
+    ) ?? "未知公司";
 
   const city =
     (typeof item.city === "string"

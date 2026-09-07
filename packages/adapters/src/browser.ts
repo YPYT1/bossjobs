@@ -67,18 +67,33 @@ export class BrowserManager {
       args: [
         `--remote-debugging-port=${this.opts.debuggingPort}`,
         "--disable-blink-features=AutomationControlled",
+        "--no-first-run",
+        "--no-default-browser-check",
       ],
       ignoreDefaultArgs: ["--enable-automation"],
       viewport: { width: 1440, height: 900 },
       locale: "zh-CN",
+      // Avoid starting stuck on a dead blank tab with no navigation target.
+      ignoreHTTPSErrors: true,
     });
 
     return this.context;
   }
 
-  async newPage(): Promise<Page> {
+  /**
+   * Reuse an existing tab when possible (persistent Chrome already opens about:blank).
+   * Avoids piling up empty tabs that look like a “黑白屏”.
+   */
+  async getPage(): Promise<Page> {
     const ctx = await this.launch();
+    for (const p of ctx.pages()) {
+      if (!p.isClosed()) return p;
+    }
     return ctx.newPage();
+  }
+
+  async newPage(): Promise<Page> {
+    return this.getPage();
   }
 
   async importCookiesFromFile(

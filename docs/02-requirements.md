@@ -89,6 +89,16 @@
 | REQ-WEB-004 | 城市薪资分析 | confirmed | done |
 | REQ-WEB-005 | 岗位详情 | confirmed | done |
 | REQ-WEB-006 | Cookie 导入设置页 | confirmed | done |
+| REQ-WEB-007 | 分析看板使用专业图表（Recharts / ECharts 等），筛选与图表可联动 | confirmed | todo |
+| REQ-WEB-008 | 关键交互与动效（服务信息理解，不堆装饰） | confirmed | todo |
+
+---
+
+## F2. 导出
+
+| ID | 需求 | 状态 | 实现 |
+|----|------|------|------|
+| REQ-EXPORT-001 | 支持将岗位及相关信息导出为 Excel | confirmed | todo |
 
 ---
 

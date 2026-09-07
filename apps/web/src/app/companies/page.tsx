@@ -44,8 +44,13 @@ export default async function CompaniesPage({
 
   return (
     <main>
-      <div className="panel">
-        <h1 style={{ marginTop: 0 }}>公司背调</h1>
+      <section className="hero">
+        <p className="hero-kicker">Company</p>
+        <h1>公司背调</h1>
+        <p>查注册信息、社保与案件摘要（依赖已配置的公司数据源）。</p>
+      </section>
+
+      <div className="surface">
         <form method="get" className="row">
           <div>
             <label>公司名称</label>
@@ -54,51 +59,48 @@ export default async function CompaniesPage({
           <button type="submit">查询</button>
         </form>
       </div>
+
       {error && (
-        <div className="panel">
-          <p>{error}</p>
+        <div className="surface" style={{ marginTop: 14 }}>
+          <p style={{ color: "var(--danger)", margin: 0 }}>{error}</p>
         </div>
       )}
+
       {row && (
-        <div className="panel">
-          <h2>{String(row.name)}</h2>
-          <table>
-            <tbody>
-              <tr>
-                <th>经营状况</th>
-                <td>{String(row.status ?? "暂无")}</td>
-              </tr>
-              <tr>
-                <th>注册时间</th>
-                <td>{String(row.registered_at ?? "暂无")}</td>
-              </tr>
-              <tr>
-                <th>注册资金</th>
-                <td>{String(row.registered_capital ?? "暂无")}</td>
-              </tr>
-              <tr>
-                <th>社保人数</th>
-                <td>{String(row.social_insurance_count ?? "暂无")}</td>
-              </tr>
-              <tr>
-                <th>在职人数</th>
-                <td>{String(row.employee_count ?? "暂无")}</td>
-              </tr>
-              <tr>
-                <th>案件摘要</th>
-                <td>
-                  <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
-                    {String(row.lawsuits_summary ?? "暂无")}
-                  </pre>
-                </td>
-              </tr>
-              <tr>
-                <th>来源</th>
-                <td>{String(row.provider ?? "-")}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <section className="section" style={{ marginTop: 28 }}>
+          <div className="section-head">
+            <h2>{String(row.name)}</h2>
+            <span className="tag">{String(row.provider ?? "-")}</span>
+          </div>
+          <dl className="detail-grid">
+            <div>
+              <dt>经营状况</dt>
+              <dd>{String(row.status ?? "暂无")}</dd>
+            </div>
+            <div>
+              <dt>注册时间</dt>
+              <dd>{String(row.registered_at ?? "暂无")}</dd>
+            </div>
+            <div>
+              <dt>注册资金</dt>
+              <dd>{String(row.registered_capital ?? "暂无")}</dd>
+            </div>
+            <div>
+              <dt>社保人数</dt>
+              <dd>{String(row.social_insurance_count ?? "暂无")}</dd>
+            </div>
+            <div>
+              <dt>在职人数</dt>
+              <dd>{String(row.employee_count ?? "暂无")}</dd>
+            </div>
+          </dl>
+          <div className="surface">
+            <h3 style={{ marginTop: 0, fontFamily: "var(--display)" }}>
+              案件摘要
+            </h3>
+            <pre className="jd">{String(row.lawsuits_summary ?? "暂无")}</pre>
+          </div>
+        </section>
       )}
     </main>
   );

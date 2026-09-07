@@ -49,4 +49,5 @@ pnpm test:api
 
 ## 文档
 
-→ [docs/README.md](./docs/README.md)
+- **总目标（只写要什么）：** [docs/VISION.md](./docs/VISION.md)
+- **文档中心：** [docs/README.md](./docs/README.md)

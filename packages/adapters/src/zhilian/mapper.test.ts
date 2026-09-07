@@ -30,7 +30,8 @@ describe("Zhilian API contract", () => {
               name: "Agent开发",
               salary60: "15-25K",
               city: { display: "重庆" },
-              companyName: "某某网络",
+              companyName: "某某网络有限公司",
+              companyNameFormat: "某某网络",
               welfareTagList: ["双休", "餐补"],
               positionURL: "https://www.zhaopin.com/jobdetail/CC123J456.htm",
             },
@@ -43,6 +44,7 @@ describe("Zhilian API contract", () => {
     expect(jobs).toHaveLength(1);
     expect(jobs[0]!.platform).toBe("zhilian");
     expect(jobs[0]!.salaryRaw).toBe("15-25K");
+    expect(jobs[0]!.companyName).toBe("某某网络有限公司");
     expect(jobs[0]!.welfare).toContain("双休");
   });
 

@@ -1,4 +1,6 @@
-import type { RawJobListItem } from "@bossjobs/core";
+import type { RawJobDetail, RawJobListItem } from "@bossjobs/core";
+import { parseRestPolicy } from "@bossjobs/core";
+import { pickCompanyFullName } from "../company-name.js";
 
 /** Minimal shape of Boss joblist.json list item (fields may evolve). */
 export interface BossJobListApiItem {
@@ -12,12 +14,44 @@ export interface BossJobListApiItem {
   jobLabels?: string[];
   welfareList?: string[];
   brandName?: string;
+  /** Legal / full company name when present on list payload. */
+  companyFullName?: string;
+  brandComName?: string;
+  comName?: string;
+  companyName?: string;
   brandId?: number | string;
   skills?: string[];
   jobExperience?: string;
   jobDegree?: string;
   securityId?: string;
   lid?: string;
+  brandComInfo?: BossBrandComInfo;
+  [key: string]: unknown;
+}
+
+export interface BossBrandComInfo {
+  brandName?: string;
+  companyName?: string;
+  companyFullName?: string;
+  comName?: string;
+  brandComName?: string;
+  [key: string]: unknown;
+}
+
+export interface BossJobDetailApiResponse {
+  code?: number;
+  message?: string;
+  zpData?: {
+    jobInfo?: {
+      postDescription?: string;
+      salaryDesc?: string;
+      address?: string;
+      jobLabels?: string[];
+      welfareList?: string[];
+    };
+    brandComInfo?: BossBrandComInfo;
+    [key: string]: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -68,6 +102,20 @@ export function mapBossListItem(
     ...(item.jobLabels ?? []),
   ].filter(Boolean);
 
+  const companyName =
+    pickCompanyFullName(
+      item.companyFullName,
+      item.brandComName,
+      item.comName,
+      item.companyName,
+      item.brandComInfo?.companyFullName,
+      item.brandComInfo?.companyName,
+      item.brandComInfo?.comName,
+      item.brandComInfo?.brandComName,
+      item.brandComInfo?.brandName,
+      item.brandName,
+    ) ?? "未知公司";
+
   return {
     platform: "boss",
     platformJobId,
@@ -76,7 +124,7 @@ export function mapBossListItem(
     location: locationParts.join("·") || undefined,
     salaryRaw: item.salaryDesc || undefined,
     welfare: welfare.length ? welfare : undefined,
-    companyName: item.brandName ?? "未知公司",
+    companyName,
     experience: item.jobExperience,
     degree: item.jobDegree,
     jobUrl: item.encryptJobId
@@ -87,6 +135,39 @@ export function mapBossListItem(
       ...(item.lid ? { lid: item.lid } : {}),
     },
     raw: item,
+  };
+}
+
+/** Map Boss detail.json → fields including company 全称 when available. */
+export function mapBossDetailResponse(
+  payload: BossJobDetailApiResponse,
+  platformJobId: string,
+): RawJobDetail {
+  const info = payload.zpData?.jobInfo;
+  const brand = payload.zpData?.brandComInfo;
+  const welfare = [
+    ...(info?.welfareList ?? []),
+    ...(info?.jobLabels ?? []),
+  ].filter(Boolean);
+  const jd = info?.postDescription;
+  const fromJd = parseRestPolicy(jd);
+  const fromTags = parseRestPolicy(welfare.join(" "));
+  return {
+    platformJobId,
+    jd: jd?.trim() || undefined,
+    salaryRaw: info?.salaryDesc || undefined,
+    location: info?.address,
+    welfare: welfare.length ? welfare : undefined,
+    companyName: pickCompanyFullName(
+      brand?.companyFullName,
+      brand?.companyName,
+      brand?.comName,
+      brand?.brandComName,
+      brand?.brandName,
+    ),
+    restPolicy: fromJd.restPolicy ?? fromTags.restPolicy ?? undefined,
+    isDoubleOff: fromJd.isDoubleOff ?? fromTags.isDoubleOff,
+    raw: payload.zpData,
   };
 }
 

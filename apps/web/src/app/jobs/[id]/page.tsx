@@ -28,50 +28,63 @@ export default async function JobDetailPage({
 
   return (
     <main>
-      <div className="panel">
-        <p className="muted">
-          <Link href="/jobs">← 返回</Link> · {job.platform}
-        </p>
-        <h1 style={{ marginTop: 0 }}>{job.title}</h1>
+      <p className="muted" style={{ marginBottom: 8 }}>
+        <Link href="/jobs">← 岗位库</Link>
+      </p>
+
+      <section className="hero" style={{ paddingTop: 8 }}>
+        <p className="hero-kicker">{job.platform}</p>
+        <h1>{job.title}</h1>
         <p>
-          {job.companyName} · {job.city}
+          {job.companyName}
+          {job.city ? ` · ${job.city}` : ""}
           {job.location ? ` · ${job.location}` : ""}
         </p>
-        <p>
-          薪资：<strong>{job.salaryRaw ?? "暂无"}</strong>
-        </p>
-        <p>休息：{job.restPolicy ?? "未知"}</p>
-        {welfare.length > 0 && (
-          <p>福利：{welfare.join("、")}</p>
-        )}
+      </section>
+
+      <dl className="detail-grid">
+        <div>
+          <dt>薪资</dt>
+          <dd className="salary">{job.salaryRaw ?? "暂无"}</dd>
+        </div>
+        <div>
+          <dt>休息</dt>
+          <dd>{job.restPolicy ?? "未知"}</dd>
+        </div>
+        <div>
+          <dt>经验</dt>
+          <dd>{job.experience ?? "—"}</dd>
+        </div>
+        <div>
+          <dt>福利</dt>
+          <dd>{welfare.length ? welfare.join("、") : "—"}</dd>
+        </div>
+      </dl>
+
+      <div className="actions" style={{ marginBottom: 28 }}>
         {job.jobUrl && (
-          <p>
-            <a href={job.jobUrl} target="_blank" rel="noreferrer">
-              原链接
-            </a>
-          </p>
+          <a className="btn ghost" href={job.jobUrl} target="_blank" rel="noreferrer">
+            打开原链接
+          </a>
         )}
-        <p>
-          <Link
-            href={`/companies?name=${encodeURIComponent(job.companyName)}`}
-          >
-            查看公司背调 →
-          </Link>
-        </p>
-      </div>
-      <div className="panel">
-        <h2>岗位 JD</h2>
-        <pre
-          style={{
-            whiteSpace: "pre-wrap",
-            fontFamily: "inherit",
-            margin: 0,
-            lineHeight: 1.55,
-          }}
+        <Link
+          className="btn"
+          href={`/companies?name=${encodeURIComponent(job.companyName)}`}
         >
-          {job.jd || "（未采集详情，请在采集时勾选 --detail）"}
-        </pre>
+          公司背调
+        </Link>
       </div>
+
+      <section className="section">
+        <div className="section-head">
+          <h2>岗位 JD</h2>
+        </div>
+        <div className="surface">
+          <pre className="jd">
+            {job.jd || "（详情采集失败或岗位无 JD，可重新采集该岗位）"}
+          </pre>
+        </div>
+      </section>
     </main>
   );
 }

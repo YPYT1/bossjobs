@@ -71,5 +71,40 @@ export function parseRestPolicy(jd: string | null | undefined): {
   if (/单休/.test(jd)) {
     return { restPolicy: "单休", isDoubleOff: false };
   }
+  if (/做六休一|六天工作/.test(jd)) {
+    return { restPolicy: "做六休一", isDoubleOff: false };
+  }
+  if (/弹性工作|弹性制/.test(jd)) {
+    return { restPolicy: "弹性", isDoubleOff: null };
+  }
   return { restPolicy: null, isDoubleOff: null };
+}
+
+/** Infer rest policy from welfare / label tags before JD is available. */
+export function parseRestFromTags(
+  tags: string[] | null | undefined,
+): {
+  restPolicy: string | null;
+  isDoubleOff: boolean | null;
+} {
+  if (!tags?.length) return { restPolicy: null, isDoubleOff: null };
+  const text = tags.join(" ");
+  return parseRestPolicy(text);
+}
+
+/** Merge keyword tags without duplicates (comma-separated). */
+export function mergeKeywords(
+  existing: string | null | undefined,
+  next: string | null | undefined,
+): string | null {
+  const parts = new Set<string>();
+  for (const raw of [existing, next]) {
+    if (!raw) continue;
+    for (const part of raw.split(/[,，]/)) {
+      const t = part.trim();
+      if (t) parts.add(t);
+    }
+  }
+  if (!parts.size) return null;
+  return [...parts].join(",");
 }

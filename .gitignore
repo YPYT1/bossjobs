@@ -40,3 +40,7 @@ pnpm-debug.log*
 
 # Coverage
 coverage/
+
+# Agent Recall data
+.assistant/
+.agent-recall/

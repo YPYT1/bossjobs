@@ -1,74 +1,84 @@
-import { JobStore, getDbPath } from "@bossjobs/core";
 import Link from "next/link";
+import { JobStore, getDbPath } from "@bossjobs/core";
 
 export const dynamic = "force-dynamic";
 
 export default function HomePage() {
   const store = new JobStore();
   let total = 0;
+  let cities = 0;
   let recent: ReturnType<JobStore["list"]> = [];
   try {
+    total = store.count({});
     recent = store.list({ limit: 8 });
-    total = recent.length;
-    // rough total
-    total = store.list({ limit: 10000 }).length;
+    const set = new Set(store.list({ limit: 5000 }).map((j) => j.city));
+    cities = set.size;
   } finally {
     store.close();
   }
 
   return (
     <main>
-      <div className="panel">
-        <h1 style={{ marginTop: 0 }}>本地岗位情报台</h1>
-        <p className="muted">
-          薄浏览器会话 + 官方接口采集 · 数据文件{" "}
-          <code>{getDbPath()}</code>
-        </p>
+      <section className="hero">
+        <p className="hero-kicker">Personal job intelligence</p>
+        <h1>BossJobs</h1>
         <p>
-          已入库岗位约 <strong>{total}</strong> 条
+          本地岗位情报台。慢速采集 Boss / 智联，自动去重入库，筛选分析，一键导出
+          Excel。
         </p>
-        <div className="row" style={{ marginTop: 12 }}>
-          <Link href="/tasks">
-            <button type="button">去采集</button>
+        <div className="actions">
+          <Link className="btn" href="/tasks">
+            开始采集
           </Link>
-          <Link href="/analytics">
-            <button type="button" className="secondary">
-              看分析
-            </button>
+          <Link className="btn ghost" href="/jobs">
+            浏览岗位库
           </Link>
         </div>
+      </section>
+
+      <div className="metrics">
+        <div className="metric">
+          <span>岗位总量</span>
+          <strong>{total}</strong>
+        </div>
+        <div className="metric">
+          <span>覆盖城市</span>
+          <strong>{cities}</strong>
+        </div>
+        <div className="metric">
+          <span>数据文件</span>
+          <strong style={{ fontSize: "0.95rem", fontFamily: "var(--font)" }}>
+            本地 SQLite
+          </strong>
+        </div>
       </div>
-      <div className="panel">
-        <h2>最近岗位</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>岗位</th>
-              <th>城市</th>
-              <th>薪资</th>
-              <th>公司</th>
-              <th>平台</th>
-            </tr>
-          </thead>
-          <tbody>
+
+      <section className="section">
+        <div className="section-head">
+          <h2>最近入库</h2>
+          <Link href="/jobs">查看全部</Link>
+        </div>
+        {recent.length === 0 ? (
+          <p className="muted">还没有岗位。先去采集一波重庆 · Agent开发。</p>
+        ) : (
+          <div className="job-list">
             {recent.map((j) => (
-              <tr key={j.id}>
-                <td>
-                  <Link href={`/jobs/${j.id}`}>{j.title}</Link>
-                </td>
-                <td>{j.city}</td>
-                <td>{j.salaryRaw ?? "-"}</td>
-                <td>
-                  <Link href={`/companies?name=${encodeURIComponent(j.companyName)}`}>
-                    {j.companyName}
-                  </Link>
-                </td>
-                <td>{j.platform}</td>
-              </tr>
+              <div className="job-row" key={j.id}>
+                <Link className="job-title" href={`/jobs/${j.id}`}>
+                  {j.title}
+                </Link>
+                <span className="muted">{j.city}</span>
+                <span className="salary">{j.salaryRaw ?? "面议"}</span>
+                <span className="muted">{j.companyName}</span>
+                <span className="tag">{j.platform}</span>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+        )}
+        <p className="muted" style={{ marginTop: 18, fontSize: "0.82rem" }}>
+          {getDbPath()}
+        </p>
+      </section>
     </main>
   );
 }
