@@ -1,11 +1,13 @@
 import type { AuthStatus, RawJobDetail, RawJobListItem } from "@bossjobs/core";
 import type { Page } from "playwright";
 import { BrowserManager } from "../browser.js";
+import { captureJsonViaCdp } from "../capture.js";
 import { resolveZhilianCityCode } from "../city-codes.js";
 import { ensureHostPage, pageFetchJson } from "../page-api.js";
 import type { JobRef, PlatformAdapter } from "../types.js";
 import {
   extractZhilianList,
+  isZhilianSearchUrl,
   mapZhilianListResponse,
   type ZhilianSearchApiResponse,
 } from "./mapper.js";
@@ -22,7 +24,6 @@ export interface ZhilianAdapterOptions {
 
 /**
  * Zhilian adapter — Path C: thin browser + fe-api.zhaopin.com/c/i/sou
- * (ported from BossHunter page-context fetch).
  */
 export class ZhilianAdapter implements PlatformAdapter {
   readonly platform = "zhilian" as const;
@@ -142,16 +143,45 @@ export class ZhilianAdapter implements PlatformAdapter {
       `&cityId=${cityId}&start=${start}&count=${API_PAGE_SIZE}`;
 
     const result = await pageFetchJson(page, url);
-    if (result.error) {
-      throw new Error(`智联 sou 请求失败: ${result.error}`);
+    if (!result.error && result.httpStatus === 200 && result.body) {
+      try {
+        const payload = JSON.parse(result.body) as ZhilianSearchApiResponse;
+        if (extractZhilianList(payload).length > 0) return payload;
+      } catch {
+        // fallback
+      }
     }
-    if (result.httpStatus !== 200) {
-      throw new Error(`智联 sou HTTP ${result.httpStatus}`);
-    }
+
+    const searchUrl = buildZhilianSearchUrl({
+      cityCode: cityId,
+      keyword: opts.keyword,
+      page: opts.page,
+    });
     try {
-      return JSON.parse(result.body) as ZhilianSearchApiResponse;
+      const { data } = await captureJsonViaCdp<ZhilianSearchApiResponse>(
+        page,
+        (u) => isZhilianSearchUrl(u) || u.includes("/c/i/sou"),
+        {
+          timeoutMs: 30_000,
+          navigate: async () => {
+            await page.goto(searchUrl, {
+              waitUntil: "domcontentloaded",
+              timeout: 60_000,
+            });
+          },
+        },
+      );
+      return data;
     } catch {
-      throw new Error("智联 sou 返回非 JSON（可能需登录或触发验证码）");
+      if (result.error) throw new Error(`智联 sou 请求失败: ${result.error}`);
+      if (result.httpStatus && result.httpStatus !== 200) {
+        throw new Error(`智联 sou HTTP ${result.httpStatus}`);
+      }
+      try {
+        return JSON.parse(result.body || "{}") as ZhilianSearchApiResponse;
+      } catch {
+        throw new Error("智联 sou 返回非 JSON（可能需登录或触发验证码）");
+      }
     }
   }
 }
