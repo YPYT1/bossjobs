@@ -20,6 +20,7 @@ BossJobs 是个人向的多平台岗位情报台：按关键词 + 城市从招�
 | 09 | [Web 与数据分析](./09-web-analytics.md) | Next.js 页面与分析能力 |
 | 10 | [路线图](./10-roadmap.md) | 一期 / 二期边界与验收 |
 | 11 | [开发进度](./11-dev-progress.md) | 实现进度快照 |
+| 12 | [Path C 架构](./12-path-c-architecture.md) | 薄浏览器 + 官方接口 |
 | 附录 | [TS + Playwright 可行性](./appendix-ts-playwright.md) | 为何一期可全 TS |
 
 ## 文档状态约定
@@ -39,4 +40,4 @@ BossJobs 是个人向的多平台岗位情报台：按关键词 + 城市从招�
 - 一期平台：Boss 直聘 + 智联招聘
 - 本地库：SQLite
 - AI 入口：可安装 CLI（优先），后续可再包一层 MCP
-- 开发状态：**文档阶段，尚未开工实现**
+- 开发状态：**脚手架 + 采集适配器 + CLI + 单元/API 契约测试已就绪；Web/扩展/live 冒烟进行中**

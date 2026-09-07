@@ -181,6 +181,13 @@ export class JobStore {
     return row ? mapJobRow(row) : null;
   }
 
+  getById(id: string): JobRecord | null {
+    const row = this.db
+      .prepare(`SELECT * FROM jobs WHERE id = ?`)
+      .get(id) as Record<string, unknown> | undefined;
+    return row ? mapJobRow(row) : null;
+  }
+
   list(opts: {
     city?: string;
     keyword?: string;

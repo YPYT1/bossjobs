@@ -1,14 +1,19 @@
 import type { AuthStatus, RawJobDetail, RawJobListItem } from "@bossjobs/core";
-import type { Page, Response } from "playwright";
+import type { Page } from "playwright";
 import { BrowserManager } from "../browser.js";
 import { resolveZhilianCityCode } from "../city-codes.js";
+import { ensureHostPage, pageFetchJson } from "../page-api.js";
 import type { JobRef, PlatformAdapter } from "../types.js";
 import {
   extractZhilianList,
-  isZhilianSearchUrl,
   mapZhilianListResponse,
   type ZhilianSearchApiResponse,
 } from "./mapper.js";
+
+/** From BossHunter zhilian.py API-fetch mode */
+const API_SEARCH_URL = "https://fe-api.zhaopin.com/c/i/sou";
+const API_PAGE_SIZE = 20;
+const HOST = "https://www.zhaopin.com/";
 
 export interface ZhilianAdapterOptions {
   browser?: BrowserManager;
@@ -16,7 +21,8 @@ export interface ZhilianAdapterOptions {
 }
 
 /**
- * Zhilian adapter: capture search JSON from real pages.
+ * Zhilian adapter — Path C: thin browser + fe-api.zhaopin.com/c/i/sou
+ * (ported from BossHunter page-context fetch).
  */
 export class ZhilianAdapter implements PlatformAdapter {
   readonly platform = "zhilian" as const;
@@ -35,19 +41,19 @@ export class ZhilianAdapter implements PlatformAdapter {
   async ensureAuth(): Promise<AuthStatus> {
     const page = await this.browser.newPage();
     try {
-      const payload = await captureZhilianSearch(page, {
-        cityCode: resolveZhilianCityCode("重庆"),
-        keyword: "测试",
+      const payload = await this.fetchSou(page, {
+        city: "重庆",
+        keyword: "工程师",
         page: 1,
       });
       const count = extractZhilianList(payload).length;
       return {
         platform: "zhilian",
-        ok: count > 0 || payload != null,
+        ok: count > 0,
         message:
           count > 0
-            ? `探测到搜索接口，列表 ${count} 条`
-            : "已打开智联搜索页，但未解析到列表（可能需登录或接口变更）",
+            ? `sou API 可用，列表 ${count} 条`
+            : "sou 无数据，请先登录智联求职者账号",
       };
     } catch (err) {
       return {
@@ -65,30 +71,30 @@ export class ZhilianAdapter implements PlatformAdapter {
     keyword: string;
     pages?: number;
   }): Promise<RawJobListItem[]> {
-    const cityCode = resolveZhilianCityCode(input.city);
-    const pages = Math.min(Math.max(input.pages ?? 1, 1), 10);
+    const pages = Math.min(Math.max(input.pages ?? 1, 1), 50);
     const page = await this.browser.newPage();
     const seen = new Set<string>();
     const results: RawJobListItem[] = [];
 
     try {
       for (let p = 1; p <= pages; p++) {
-        const payload = await captureZhilianSearch(page, {
-          cityCode,
+        const payload = await this.fetchSou(page, {
+          city: input.city,
           keyword: input.keyword,
           page: p,
         });
         const mapped = mapZhilianListResponse(payload, input.city);
+        if (mapped.length === 0 && p === 1) {
+          throw new Error(
+            "智联 sou 无列表。请 `bossjobs auth setup` 登录 zhaopin.com。",
+          );
+        }
         for (const item of mapped) {
           if (seen.has(item.platformJobId)) continue;
           seen.add(item.platformJobId);
           results.push(item);
         }
-        if (mapped.length === 0 && p === 1) {
-          throw new Error(
-            "智联搜索接口未返回列表。请先 bossjobs auth setup 登录，或更新 Adapter URL 匹配规则。",
-          );
-        }
+        if (mapped.length < API_PAGE_SIZE) break;
         if (p < pages) await page.waitForTimeout(this.pageDelayMs);
       }
       return results;
@@ -107,7 +113,7 @@ export class ZhilianAdapter implements PlatformAdapter {
         waitUntil: "domcontentloaded",
         timeout: 60_000,
       });
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(1200);
       const jd = await page
         .locator(
           ".describtion__detail-content, .job-detail, [class*='description']",
@@ -123,6 +129,31 @@ export class ZhilianAdapter implements PlatformAdapter {
       await page.close().catch(() => undefined);
     }
   }
+
+  private async fetchSou(
+    page: Page,
+    opts: { city: string; keyword: string; page: number },
+  ): Promise<ZhilianSearchApiResponse> {
+    await ensureHostPage(page, HOST);
+    const cityId = resolveZhilianCityCode(opts.city);
+    const start = (opts.page - 1) * API_PAGE_SIZE;
+    const url =
+      `${API_SEARCH_URL}?keyword=${encodeURIComponent(opts.keyword)}` +
+      `&cityId=${cityId}&start=${start}&count=${API_PAGE_SIZE}`;
+
+    const result = await pageFetchJson(page, url);
+    if (result.error) {
+      throw new Error(`智联 sou 请求失败: ${result.error}`);
+    }
+    if (result.httpStatus !== 200) {
+      throw new Error(`智联 sou HTTP ${result.httpStatus}`);
+    }
+    try {
+      return JSON.parse(result.body) as ZhilianSearchApiResponse;
+    } catch {
+      throw new Error("智联 sou 返回非 JSON（可能需登录或触发验证码）");
+    }
+  }
 }
 
 export function buildZhilianSearchUrl(opts: {
@@ -131,55 +162,5 @@ export function buildZhilianSearchUrl(opts: {
   page: number;
 }): string {
   const kw = encodeURIComponent(opts.keyword);
-  // Public search URL; page triggers XHR that we capture.
   return `https://www.zhaopin.com/sou/jl${opts.cityCode}/kw${kw}/p${opts.page}`;
-}
-
-async function captureZhilianSearch(
-  page: Page,
-  opts: { cityCode: string; keyword: string; page: number },
-): Promise<ZhilianSearchApiResponse> {
-  const captured: ZhilianSearchApiResponse[] = [];
-
-  const onResponse = async (res: Response) => {
-    try {
-      if (!isZhilianSearchUrl(res.url())) return;
-      if (res.status() !== 200) return;
-      const ct = res.headers()["content-type"] ?? "";
-      if (!ct.includes("json") && !ct.includes("javascript")) return;
-      const json = (await res.json()) as ZhilianSearchApiResponse;
-      if (extractZhilianList(json).length > 0 || json.data || json.results) {
-        captured.push(json);
-      }
-    } catch {
-      // ignore non-json
-    }
-  };
-
-  page.on("response", onResponse);
-  try {
-    const url = buildZhilianSearchUrl(opts);
-    await page.goto(url, { waitUntil: "networkidle", timeout: 60_000 });
-    await page.waitForTimeout(2000);
-
-    if (captured.length === 0) {
-      // Fallback: wait explicitly once more
-      try {
-        const res = await page.waitForResponse(
-          (r) => isZhilianSearchUrl(r.url()) && r.status() === 200,
-          { timeout: 15_000 },
-        );
-        return (await res.json()) as ZhilianSearchApiResponse;
-      } catch {
-        return {};
-      }
-    }
-    // Prefer payload with the most items
-    captured.sort(
-      (a, b) => extractZhilianList(b).length - extractZhilianList(a).length,
-    );
-    return captured[0]!;
-  } finally {
-    page.off("response", onResponse);
-  }
 }

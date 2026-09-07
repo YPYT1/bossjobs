@@ -1,10 +1,14 @@
 /**
- * Probe Boss search page and print captured API URLs + sample fields.
- * Usage: pnpm --filter @bossjobs/adapters probe:boss
+ * Probe Boss search page via CDP body capture.
  */
 import { BrowserManager } from "../browser.js";
 import { buildBossSearchUrl } from "../boss/adapter.js";
-import { isBossJobListUrl, mapBossListResponse } from "../boss/mapper.js";
+import {
+  isBossJobListUrl,
+  mapBossListResponse,
+  type BossJobListApiResponse,
+} from "../boss/mapper.js";
+import { captureJsonViaCdp } from "../capture.js";
 import { resolveBossCityCode } from "../city-codes.js";
 
 async function main() {
@@ -13,14 +17,6 @@ async function main() {
   const browser = new BrowserManager({ headless: false });
   const page = await browser.newPage();
 
-  const urls: string[] = [];
-  page.on("response", async (res) => {
-    const u = res.url();
-    if (u.includes("zhipin.com") && u.includes("/wapi/")) {
-      urls.push(`${res.status()} ${u.slice(0, 180)}`);
-    }
-  });
-
   const searchUrl = buildBossSearchUrl({
     cityCode: resolveBossCityCode(city),
     keyword,
@@ -28,22 +24,31 @@ async function main() {
   });
   console.log("goto", searchUrl);
 
-  const responsePromise = page.waitForResponse(
-    (res) => isBossJobListUrl(res.url()) && res.status() === 200,
-    { timeout: 60_000 },
-  );
-  await page.goto(searchUrl, { waitUntil: "domcontentloaded" });
-
   try {
-    const res = await responsePromise;
-    const json = await res.json();
-    const jobs = mapBossListResponse(json, city);
-    console.log("captured", res.url());
-    console.log("jobs", jobs.length);
+    const { url, data } = await captureJsonViaCdp<BossJobListApiResponse>(
+      page,
+      isBossJobListUrl,
+      {
+        navigate: async () => {
+          await page.goto(searchUrl, {
+            waitUntil: "domcontentloaded",
+            timeout: 60_000,
+          });
+        },
+      },
+    );
+    const jobs = mapBossListResponse(data, city);
+    const withSalary = jobs.filter((j) => j.salaryRaw).length;
+    console.log("captured", url);
+    console.log("jobs", jobs.length, "withSalary", withSalary);
     console.log("sample", jobs[0]);
+    console.log(
+      "salaries",
+      jobs.slice(0, 8).map((j) => [j.title, j.salaryRaw, j.companyName]),
+    );
   } catch (err) {
-    console.error("failed to capture joblist.json", err);
-    console.error("seen /wapi/ urls:\n", urls.join("\n"));
+    console.error(err);
+    process.exitCode = 1;
   } finally {
     await browser.close();
   }

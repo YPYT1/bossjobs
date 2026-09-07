@@ -1,0 +1,17 @@
+{
+  "name": "bossjobs-cookie-export",
+  "version": "0.1.0",
+  "description": "Export cookies for Boss / Zhilian / Yupao into BossJobs",
+  "manifest_version": 3,
+  "action": {
+    "default_title": "导出 Cookie 到 BossJobs",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["cookies", "activeTab"],
+  "host_permissions": [
+    "*://*.zhipin.com/*",
+    "*://*.zhaopin.com/*",
+    "*://*.yupao.com/*",
+    "*://*.ypzp.com/*"
+  ]
+}

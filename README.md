@@ -1,36 +1,52 @@
 # BossJobs
 
-个人向多平台岗位情报台（Boss + 智联）——本地采集、CLI（人/AI）、Web 分析、公司背调。
+个人向多平台岗位情报台（Boss + 智联）：**薄浏览器会话 + 官方接口**采集，本地 SQLite，CLI（人/AI），Next.js 分析，公司背调。
 
-## 文档
+仓库：https://github.com/YPYT1/bossjobs
 
-→ **[docs/README.md](./docs/README.md)**（需求与架构，文档先行）
+## 架构（Path C）
+
+见 [docs/12-path-c-architecture.md](./docs/12-path-c-architecture.md)
+
+1. 启动专用 Chrome Profile（`~/.bossjobs/browser-profile`）
+2. 在页面上下文 `fetch` 官方搜索 API（带 Cookie / `Zp_token`）
+3. 失败时降级 CDP 旁听
+4. 写入本地库，CLI / Web 共用
 
 ## 快速开始
 
 ```bash
 pnpm install
-pnpm exec playwright install chrome
-pnpm test:unit          # 单元 + 接口契约测试
-pnpm test:api           # API mapper / URL 契约
-# 真实浏览器冒烟（需先登录 Profile）:
-# BOSSJOBS_LIVE=1 pnpm test:live
+pnpm --filter @bossjobs/cli start -- --help
 
-pnpm --filter @bossjobs/cli build
-pnpm --filter @bossjobs/cli exec bossjobs --help
-# 或: pnpm --filter @bossjobs/cli dev -- auth setup
+# 首次登录（专用浏览器）
+pnpm --filter @bossjobs/cli start -- auth setup
+
+# 采集
+pnpm --filter @bossjobs/cli start -- collect --platform boss --city 重庆 --keyword AI开发 --pages 2 --detail --json
+
+# 多关键词
+pnpm --filter @bossjobs/cli start -- collect --platform zhilian --city 重庆 --keywords "AI开发,Agent" --pages 1 --json
+
+# 分析 / 公司
+pnpm --filter @bossjobs/cli start -- analyze salary --keyword AI --json
+pnpm --filter @bossjobs/cli start -- company "腾讯科技" --json
+
+# Web
+pnpm --filter @bossjobs/web dev
+# http://localhost:3456
 ```
 
-探测真实接口：
+Cookie 扩展：Chrome 加载 `packages/extension`（开发者模式）。
+
+## 测试
 
 ```bash
-pnpm --filter @bossjobs/adapters probe:boss 重庆 AI开发
-pnpm --filter @bossjobs/adapters probe:zhilian 重庆 AI开发
+pnpm test:unit
+pnpm test:api
+# BOSSJOBS_LIVE=1 pnpm test:live
 ```
 
-## 技术栈
+## 文档
 
-- 全 TypeScript + pnpm monorepo
-- Playwright（Persistent Profile `bossjobs` / CDP）
-- SQLite（`node:sqlite` → `~/.bossjobs/data.db`）
-- CLI：`@bossjobs/cli`
+→ [docs/README.md](./docs/README.md)

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>BossJobs Cookie</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        width: 360px;
+        margin: 12px;
+      }
+      button {
+        margin: 4px 4px 4px 0;
+      }
+      textarea {
+        width: 100%;
+        height: 160px;
+        font-size: 11px;
+      }
+      .hint {
+        color: #666;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>BossJobs Cookie 导出</h3>
+    <p class="hint">选择平台 → 复制 JSON → CLI: bossjobs auth import-cookie --platform boss --text '…'</p>
+    <div>
+      <button data-platform="boss">Boss</button>
+      <button data-platform="zhilian">智联</button>
+      <button data-platform="yupao">鱼泡(预留)</button>
+      <button id="copy">复制</button>
+    </div>
+    <textarea id="out" readonly></textarea>
+    <script src="popup.js"></script>
+  </body>
+</html>

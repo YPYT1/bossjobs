@@ -1,8 +1,12 @@
-/**
- * Common Boss city codes. Full list can be refreshed from the live site later.
- * REQ-COLLECT-002
- */
-export const BOSS_CITY_CODES: Record<string, string> = {
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** Fallback subset if JSON missing. */
+const FALLBACK_BOSS: Record<string, string> = {
+  全国: "100010000",
   北京: "101010100",
   上海: "101020100",
   广州: "101280100",
@@ -17,20 +21,9 @@ export const BOSS_CITY_CODES: Record<string, string> = {
   天津: "101030100",
   长沙: "101250100",
   郑州: "101180100",
-  青岛: "101120200",
-  大连: "101070200",
-  厦门: "101230200",
-  合肥: "101220100",
-  福州: "101230100",
-  济南: "101120100",
-  东莞: "101281600",
-  佛山: "101280800",
-  宁波: "101210400",
-  无锡: "101190200",
-  全国: "100010000",
 };
 
-/** Zhilian city ids commonly used in search (subset). */
+/** Zhilian city ids (BossHunter / public sou URLs). */
 export const ZHILIAN_CITY_CODES: Record<string, string> = {
   北京: "530",
   上海: "538",
@@ -46,21 +39,48 @@ export const ZHILIAN_CITY_CODES: Record<string, string> = {
   天津: "531",
   长沙: "749",
   郑州: "719",
+  青岛: "703",
+  大连: "600",
+  厦门: "682",
+  合肥: "664",
+  福州: "681",
+  济南: "702",
+  东莞: "779",
+  佛山: "768",
+  宁波: "654",
+  无锡: "636",
   全国: "489",
 };
 
+let bossCache: Record<string, string> | null = null;
+
+export function loadBossCityCodes(): Record<string, string> {
+  if (bossCache) return bossCache;
+  const jsonPath = path.join(__dirname, "..", "data", "city_codes.json");
+  try {
+    const raw = fs.readFileSync(jsonPath, "utf8");
+    bossCache = JSON.parse(raw) as Record<string, string>;
+  } catch {
+    bossCache = { ...FALLBACK_BOSS };
+  }
+  return bossCache;
+}
+
 export function resolveBossCityCode(cityName: string): string {
-  const code = BOSS_CITY_CODES[cityName];
+  const map = loadBossCityCodes();
+  const code = map[cityName] ?? map[cityName.replace(/市$/, "")];
   if (!code) {
     throw new Error(
-      `未知 Boss 城市「${cityName}」。可用: ${Object.keys(BOSS_CITY_CODES).join("、")}`,
+      `未知 Boss 城市「${cityName}」。可用示例: 重庆、北京、上海…`,
     );
   }
   return code;
 }
 
 export function resolveZhilianCityCode(cityName: string): string {
-  const code = ZHILIAN_CITY_CODES[cityName];
+  const code =
+    ZHILIAN_CITY_CODES[cityName] ??
+    ZHILIAN_CITY_CODES[cityName.replace(/市$/, "")];
   if (!code) {
     throw new Error(
       `未知智联城市「${cityName}」。可用: ${Object.keys(ZHILIAN_CITY_CODES).join("、")}`,
@@ -68,3 +88,17 @@ export function resolveZhilianCityCode(cityName: string): string {
   }
   return code;
 }
+
+export const BOSS_CITY_CODES = new Proxy({} as Record<string, string>, {
+  get(_t, prop: string) {
+    return loadBossCityCodes()[prop];
+  },
+  ownKeys() {
+    return Reflect.ownKeys(loadBossCityCodes());
+  },
+  getOwnPropertyDescriptor(_t, prop) {
+    const v = loadBossCityCodes()[prop as string];
+    if (v === undefined) return undefined;
+    return { configurable: true, enumerable: true, value: v };
+  },
+});

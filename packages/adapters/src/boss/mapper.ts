@@ -74,7 +74,7 @@ export function mapBossListItem(
     title: item.jobName ?? "",
     city: item.cityName ?? fallbackCity,
     location: locationParts.join("·") || undefined,
-    salaryRaw: item.salaryDesc,
+    salaryRaw: item.salaryDesc || undefined,
     welfare: welfare.length ? welfare : undefined,
     companyName: item.brandName ?? "未知公司",
     experience: item.jobExperience,

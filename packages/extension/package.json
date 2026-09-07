@@ -1,0 +1,10 @@
+{
+  "name": "@bossjobs/extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome MV3 cookie export for BossJobs",
+  "scripts": {
+    "build": "echo \"Load packages/extension via chrome://extensions\"",
+    "test": "echo \"no tests\""
+  }
+}

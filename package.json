@@ -5,6 +5,8 @@
   "scripts": {
     "build": "pnpm -r --filter=./packages/* build",
     "dev:cli": "pnpm --filter @bossjobs/cli dev",
+    "dev:web": "pnpm --filter @bossjobs/web dev",
+    "build:web": "pnpm --filter @bossjobs/web build",
     "test": "pnpm -r --filter=./packages/* test",
     "test:unit": "pnpm --filter @bossjobs/core test && pnpm --filter @bossjobs/adapters test",
     "test:api": "pnpm --filter @bossjobs/adapters test:api",
@@ -12,6 +14,6 @@
     "lint": "pnpm -r --filter=./packages/* exec tsc -p tsconfig.json --noEmit"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   }
 }
