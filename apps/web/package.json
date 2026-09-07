@@ -1,0 +1,10 @@
+{
+  "name": "@bossjobs/web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"Web app scaffold in next milestone\"",
+    "build": "echo \"skip\"",
+    "test": "echo \"no tests yet\""
+  }
+}

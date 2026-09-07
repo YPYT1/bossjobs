@@ -1,0 +1,25 @@
+{
+  "name": "@bossjobs/cli",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "bossjobs": "./bin/bossjobs.mjs"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx src/index.ts",
+    "start": "tsx src/index.ts",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@bossjobs/adapters": "workspace:*",
+    "@bossjobs/core": "workspace:*",
+    "commander": "^13.1.0",
+    "tsx": "^4.19.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.9"
+  }
+}
